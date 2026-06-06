@@ -1,0 +1,14 @@
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+class Config:
+    BALLCHASING_API_TOKEN = os.getenv("BALLCHASING_API_TOKEN")
+    BALLCHASING_API_BASE_URL = os.getenv("BALLCHASING_API_BASE_URL")
+
+    DATABRICKS_WORKSPACE_URL = os.getenv("DATABRICKS_WORKSPACE_URL")
+    DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN")
+    DATABRICKS_JOB_ID = int(os.getenv("DATABRICKS_JOB_ID"))
+
+    AZURE_BLOB_STORAGE_CONNECTION_STRING = os.getenv("AZURE_BLOB_STORAGE_CONNECTION_STRING")
