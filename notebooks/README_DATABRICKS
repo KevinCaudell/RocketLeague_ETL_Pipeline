@@ -1,0 +1,27 @@
+# Databricks Notebook Export (Reference Only)
+
+This directory contains exported copies of Databricks notebooks used in my data pipeline project.
+
+## ⚠️ Important Notice
+
+- These files are **reference exports** of notebooks running in my Databricks workspace.
+- They represent the **exact logic and structure** used in the pipeline.
+- However, they are **not directly executable as-is** in a local environment.
+
+## Why this is the case
+
+This project is built and executed within Databricks, and relies on:
+- Workspace-managed execution context
+- External services (Azure Blob Storage, APIs, etc.)
+- Environment-specific configuration values (not included for security reasons)
+
+## Purpose of this repository
+
+This GitHub repository is intended to:
+- Showcase pipeline architecture (Bronze → Silver → Gold)
+- Demonstrate data engineering logic and transformations
+- Provide a transparent view of notebook code used in Databricks
+
+## Note on configuration
+
+Sensitive credentials and environment-specific values have been removed or replaced with placeholders for security reasons.
