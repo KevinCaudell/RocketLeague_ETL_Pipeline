@@ -10,25 +10,27 @@ It demonstrates how raw API data can be ingested, processed, and transformed int
 
 ## Architecture
 
-The pipeline follows a **Medallion Architecture (Bronze → Silver → Gold)**:
+This pipeline follows a **Medallion Architecture** designed to progressively transform raw Rocket League replay data into analytics-ready datasets.
 
-Rocket League API  
-↓
+```text
+Rocket League API
+        ↓
+Bronze Layer (Azure Blob Storage)
+- Raw JSON replay data ingestion
+- No transformations applied (source of truth)
 
-#### Bronze Layer (Azure Blob Storage)
-- Raw JSON replay data stored in cloud storage  
+        ↓
+Silver Layer (Databricks - PySpark)
+- Data cleaning and schema normalization
+- Flattening nested replay/player structures
+- Preparation for analytics
 
-↓
-
-#### Silver Layer (Databricks - PySpark)
-- Data cleaning, flattening, and transformation  
-- Normalization of replay and player structures  
-
-↓
-
-#### Gold Layer (Databricks / Azure SQL)
-- Aggregated analytics tables  
-- Player and match-level performance metrics  
+        ↓
+Gold Layer (Databricks / Azure SQL)
+- Aggregated player & match metrics
+- Analytics-ready datasets for reporting
+- Optimized for querying and dashboards
+``` 
 
 ---
 
@@ -44,7 +46,7 @@ Rocket League API
 
 ## ETL Process
 
-### 1. Extract
+### 1. Data Ingestion (Extract)
 - Pull replay data from the Rocket League API
 - Store raw JSON response
 
@@ -62,13 +64,13 @@ Rocket League API
 
 ---
 
-## Key Features
+## Engineering Highlights
 
-- End-to-end ETL pipeline (API → Azure Storage → Databricks → SQL)
-- Medallion architecture implementation
-- PySpark-based distributed data processing
-- Cloud-native data engineering workflow
-- Modular and reusable pipeline structure
+- Handles semi-structured JSON replay data with nested structures  
+- Implements Medallion architecture for progressive data refinement  
+- Uses PySpark in Databricks for distributed data processing  
+- Separates raw, cleaned, and analytics-ready datasets for traceability  
+- Designed for cloud-native scalability using Azure services  
 
 ---
 
@@ -100,14 +102,19 @@ They are **not directly runnable in a local environment without configuration se
 
 ---
 
-## Purpose
+## Project Goals & Engineering Focus
 
-This project was built to demonstrate:
+This project was built to demonstrate real-world data engineering capabilities by designing and implementing a cloud-based ETL pipeline.
 
-- Real-world data engineering pipeline design
-- Cloud data processing using Azure + Databricks
-- Working with semi-structured JSON data
-- ETL best practices using modern tools
+It focuses on solving practical engineering challenges such as:
+
+- Ingesting raw semi-structured JSON data from external APIs  
+- Designing a Medallion architecture for scalable data processing  
+- Building transformation logic using PySpark in Databricks  
+- Ensuring data traceability across all pipeline stages (Bronze → Silver → Gold)  
+- Producing analytics-ready datasets for downstream reporting and insights  
+
+This project simulates a production-style data workflow commonly used in modern cloud data engineering environments.
 
 ---
 
