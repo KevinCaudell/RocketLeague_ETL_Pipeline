@@ -47,5 +47,5 @@ def writeRawJSON(data):
     """Writes to JSON file"""
     with open('jsonFiles/raw_replays.json', 'w') as file:
         json.dump(data, file, indent=4)
-    print('Raw Replays successfully saved to JSON file!')
+    print('\nRaw Replays successfully saved to JSON file!\n')
     time.sleep(1)
