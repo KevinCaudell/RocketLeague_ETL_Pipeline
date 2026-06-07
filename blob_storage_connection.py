@@ -12,4 +12,4 @@ def upload_to_blob(container_name, file_path, blob_name, conn_string):
     with open(file_path, 'rb') as data:
         blob_client.upload_blob(data, overwrite=True)
 
-    print(f"Uploaded {file_path} → {container_name}/{blob_name}")
+    print(f"Uploaded {file_path} → {container_name}/{blob_name}\n")
