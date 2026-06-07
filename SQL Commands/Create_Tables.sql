@@ -41,8 +41,8 @@ IF OBJECT_ID('dbo.dim_Seasons', 'U') IS NULL
 BEGIN
     CREATE TABLE dim_Seasons(
         season_id INT PRIMARY KEY,
-        season_number INT NOT NULL UNIQUE,
-        season_type VARCHAR(30) NOT NULL UNIQUE
+        season_number INT NOT NULL,
+        season_type VARCHAR(30) NOT NULL,
     );
 END
 GO
