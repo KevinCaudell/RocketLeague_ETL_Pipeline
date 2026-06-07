@@ -43,8 +43,8 @@ BEGIN
         replay_id        VARCHAR(200) NOT NULL,
         player_id        VARCHAR(200) NOT NULL,
         team             VARCHAR(6) NOT NULL,
-        score            VARCHAR(100) NOT NULL,
-        mvp              VARCHAR(100) NOT NULL,
+        score            BIGINT NOT NULL,
+        mvp              BOOLEAN NOT NULL,
         start_time       DECIMAL(10,2) NOT NULL,
         end_time         DECIMAL(10,2) NOT NULL,
 
