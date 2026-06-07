@@ -1,0 +1,124 @@
+# Step 1: Give Databricks access to Blob Storage
+spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net", "<YOUR BLOB STORAGE KEY>")
+
+# Step 2: Path to Bronze Level Blob Storage
+bronze_df = spark.read.option("multiline", "true").json("wasbs://bronze-raw-data@rocketleaguetracker.blob.core.windows.net/replays/")
+
+# Step 3: Explode JSON from a List to Rows
+from pyspark.sql.functions import (explode, col, when, first, lit, coalesce)
+from pyspark.sql.functions import to_timestamp
+
+exploded_bronze_df = bronze_df.select(explode("list").alias("Replays"))
+
+# Build Silver DataFrames (Replays, Players, Match Stats)
+
+# Silver Replays
+silver_replays_df = exploded_bronze_df.select(
+    col("Replays.id").alias("replay_id"),
+    col("Replays.rocket_league_id"),
+    col("Replays.replay_title"),
+    col("Replays.map_name"),
+    col("Replays.playlist_name").alias("playlist"),
+    col("Replays.duration").alias("match_duration"),
+    col("Replays.season"),
+    col("Replays.season_type"),
+    to_timestamp(col("Replays.date")).alias("date_time"),
+    coalesce(col("Replays.blue.goals"), lit(0)).alias("blue_goals"),
+    coalesce(col("Replays.orange.goals"), lit(0)).alias("orange_goals"),
+    when(
+        coalesce(col("Replays.blue.goals"), lit(0)) >
+        coalesce(col("Replays.orange.goals"), lit(0)),
+        "Blue"
+    ).when(
+        coalesce(col("Replays.blue.goals"), lit(0)) <
+        coalesce(col("Replays.orange.goals"), lit(0)),
+        "Orange"
+    )
+    .otherwise("Tie")
+    .alias("winner")
+)
+
+# Silver Players
+blue_players_df = exploded_bronze_df.select(
+    col("Replays.id").alias("replay_id"),
+    explode("Replays.blue.players").alias("player")
+)
+
+blue_players = blue_players_df.select(
+    col("player.id.id").alias("player_id"),
+    col("player.name").alias("player_name"),
+    col("player.id.platform").alias("platform")
+)
+
+orange_players_df = exploded_bronze_df.select(
+    col("Replays.id").alias("replay_id"),
+    explode("Replays.orange.players").alias("player")
+)
+
+orange_players = orange_players_df.select(
+    col("player.id.id").alias("player_id"),
+    col("player.name").alias("player_name"),
+    col("player.id.platform").alias("platform")
+)
+
+all_players = blue_players.unionByName(orange_players)
+
+from pyspark.sql import Window
+
+silver_players_df = all_players.dropDuplicates(["player_id"])
+
+# Silver Match Stats
+
+blue_stats_df = exploded_bronze_df.select(
+    col("Replays.id").alias("replay_id"),
+    explode("Replays.blue.players").alias("player")
+)
+
+blue_stats = blue_stats_df.select(
+    col("replay_id"),
+    col("player.id.id").alias("player_id"),
+    lit("blue").alias("team"),
+    col("player.score").alias("score"),
+    (when(col("player.mvp") == True, True).otherwise(False)).alias("mvp"),
+    col("player.start_time").cast("decimal(10,2)").alias("start_time"),
+    col("player.end_time").cast("decimal(10,2)").alias("end_time")
+)
+
+orange_stats_df = exploded_bronze_df.select(
+    col("Replays.id").alias("replay_id"),
+    explode("Replays.orange.players").alias("player")
+)
+
+orange_stats = orange_stats_df.select(
+    col("replay_id"),
+    col("player.id.id").alias("player_id"),
+    lit("orange").alias("team"),
+    col("player.score").alias("score"),
+    (when(col("player.mvp") == True, True).otherwise(False)).alias("mvp"),
+    col("player.start_time").cast("decimal(10,2)").alias("start_time"),
+    col("player.end_time").cast("decimal(10,2)").alias("end_time")
+)
+
+silver_match_stats_df = blue_stats.unionByName(orange_stats)
+
+# Write Silver DataFrames to Silver Blob Container
+
+silver_replays_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/replays/")
+
+silver_players_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/players/")
+
+silver_match_stats_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/match_stats/")
+
+print("Silver transformation completed successfully")

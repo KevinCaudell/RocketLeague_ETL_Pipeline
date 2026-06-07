@@ -1,0 +1,95 @@
+# Give Databricks access to Blob Storage
+spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net", "<YOUR AZURE BLOB STORAGE KEY>")
+
+
+# Read Silver Data
+
+silver_replays_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/replays"
+)
+
+silver_players_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/players"
+)
+
+silver_match_stats_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/match_stats"
+)
+
+# Database Connection (JDBC variables)
+
+SERVER = 'rocketleague-sql-server.database.windows.net'
+DATABASE = 'rocketleague-db'
+ADMIN = 'KevB0B'
+PASSWORD = 'DEproject1'
+
+jdbc_url = (
+    f"jdbc:sqlserver://{SERVER}:1433;"
+    f"database={DATABASE};"
+    "encrypt=true;"
+    "trustServerCertificate=false;"
+    "hostNameInCertificate=*.database.windows.net;"
+    "loginTimeout=30;"
+)
+
+connection_properties = {
+    "user": ADMIN,
+    "password": PASSWORD,
+    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+}
+
+# Write Silver DataFrames to Azure SQL DB using Overwrite + Truncate
+
+empty_match_stats = spark.createDataFrame([], silver_match_stats_df.schema)
+empty_match_stats.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.Match_Stats",
+    properties=connection_properties
+)
+
+# Players
+empty_players = spark.createDataFrame([], silver_players_df.schema)
+empty_players.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.Players",
+    properties=connection_properties
+)
+
+# Replays (parent)
+empty_replays = spark.createDataFrame([], silver_replays_df.schema)
+empty_replays.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.Replays",
+    properties=connection_properties
+)
+
+print("All tables cleared safely")
+
+# Load Data into Azure SQL DB
+
+# Replays FIRST (parent table)
+silver_replays_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.Replays",
+    properties=connection_properties
+)
+
+print("Replays loaded")
+
+# Players SECOND
+silver_players_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.Players",
+    properties=connection_properties
+)
+
+print("Players loaded")
+
+# Match Stats LAST (child table)
+silver_match_stats_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.Match_Stats",
+    properties=connection_properties
+)
+
+print("Match Stats loaded")
