@@ -29,3 +29,7 @@ jsonFiles/.gitkeep
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Ignore MySQL WorkBench files
+*.mwb
+*.mwb.bak
