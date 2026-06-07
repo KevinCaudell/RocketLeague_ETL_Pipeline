@@ -25,7 +25,12 @@ GO
 IF OBJECT_ID('dbo.dim_Dates', 'U') IS NULL
 BEGIN
     CREATE TABLE dim_Dates(
-        date_id DATE PRIMARY KEY
+        date_id DATE PRIMARY KEY,
+        year INT NOT NULL,
+        month INT NOT NULL,
+        day INT NOT NULL,
+        quarter INT NOT NULL,
+        day_of_week INT NOT NULL
     );
 END
 GO
