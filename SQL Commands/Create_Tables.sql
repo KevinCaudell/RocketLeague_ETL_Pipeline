@@ -67,6 +67,8 @@ BEGIN
         orange_goals     INT NOT NULL,
         winner           VARCHAR(6) NOT NULL,
 
+        CONSTRAINT chk_winner CHECK (winner IN ('Blue', 'Orange', 'Tie')),
+
         map_id INT NOT NULL,
         playlist_id INT NOT NULL,
         season_id INT NOT NULL,
@@ -76,9 +78,6 @@ BEGIN
         FOREIGN KEY (playlist_id) REFERENCES dim_Playlists(playlist_id),
         FOREIGN KEY (season_id) REFERENCES dim_Seasons(season_id),
         FOREIGN KEY (date_id) REFERENCES dim_Dates(date_id)
-        
-        -- Fixed: Ensured clean standard spaces and removed the trailing comma here
-        CONSTRAINT chk_winner CHECK (winner IN ('Blue', 'Orange', 'Tie')) 
     );
 END
 GO
