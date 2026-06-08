@@ -16,7 +16,7 @@ def triggerDatabrickJob(workspace_url, token, job_id):
 
     return res.json()["run_id"]
 
-def wait_for_Databricks_run(workspace_url, token, run_id, timeout=600):
+def wait_for_Databricks_run(workspace_url, token, run_id, timeout=1000):
     url = f"{workspace_url}/api/2.1/jobs/runs/get"
 
     headers = {
@@ -50,4 +50,4 @@ def wait_for_Databricks_run(workspace_url, token, run_id, timeout=600):
             print("Timeout waiting for Databricks job")
             return False
 
-        time.sleep(5)
+        time.sleep(10)
