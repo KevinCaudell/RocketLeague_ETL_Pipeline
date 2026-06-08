@@ -2,7 +2,7 @@ import requests as req
 import json
 import time
 
-def runAPI(token, base_url, max_replays=50):
+def runAPI(token, base_url, max_replays=10000):
     """Fetches all replay pages from Ballchasing"""
 
     if max_replays > 10000 or max_replays < 50:
