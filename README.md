@@ -17,7 +17,7 @@ Rocket League API
         ↓
 Bronze Layer (Azure Blob Storage)
 - Raw JSON replay data ingestion
-- No transformations applied (source of truth)
+- No transformations applied
 
         ↓
 Silver Layer (Databricks - PySpark)
