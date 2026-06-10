@@ -1,4 +1,4 @@
-# Rocket League ETL Pipeline (Databricks + Azure)
+# Rocket League ETL Pipeline (Databricks + Azure + Python)
 
 ## Project Overview
 
@@ -31,6 +31,37 @@ Gold Layer (Databricks / Azure SQL)
 - Analytics-ready datasets for reporting
 - Optimized for querying and dashboards
 ``` 
+
+---
+
+## Data Model (ERD)
+
+The database contains both Silver and Gold layer tables following a Medallion architecture design.
+
+![Rocket League ERD](images/RL_Analytics_ERD.png)
+
+# Silver Tables
+
+- Replays
+- Match Stats
+
+These tables contain detailed replay level data used as the foundation for downstream analytics.
+
+# Gold Tables
+
+
+- dim_Players
+- dim_Dates
+- dim_Seasons
+- dim_Playlists
+- dim_Maps
+- Player_Performance
+- Season_Performance
+- Map_Performance
+- Playlist_Performance
+- Daily_Metrics
+
+These tables contain aggregated KPIs and metrics designed for Power BI reporting and performancew analysis.
 
 ---
 
@@ -77,14 +108,6 @@ Gold Layer (Databricks / Azure SQL)
 ## Data Flow Diagram
 
 API → Blob Storage (Bronze) → Databricks (Silver) → SQL (Gold)
-
----
-
-## Data Model (ERD)
-
-The Gold layer follows a dimensional modeling approach consisting of fact and dimension tables optimized for analytics workloads.
-
-![Rocket League ERD](images/RocketLeague_Analytics_ERD.png)
 
 ---
 
