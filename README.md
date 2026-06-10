@@ -17,7 +17,7 @@ Rocket League API
         ↓
 Bronze Layer (Azure Blob Storage)
 - Raw JSON replay data ingestion
-- No transformations applied (source of truth)
+- No transformations applied
 
         ↓
 Silver Layer (Databricks - PySpark)
@@ -47,7 +47,7 @@ Gold Layer (Databricks / Azure SQL)
 ## ETL Process
 
 ### 1. Data Ingestion (Extract)
-- Pull replay data from the Rocket League API
+- Pull replay data from the Ball Chasing (Rocket League) API
 - Store raw JSON response
 
 ### 2. Load (Bronze Layer)
@@ -76,9 +76,9 @@ Gold Layer (Databricks / Azure SQL)
 
 ## Data Flow Diagram
 
-(Optional but highly recommended)
-
 API → Blob Storage (Bronze) → Databricks (Silver) → SQL (Gold)
+
+---
 
 ## Security Notice
 
