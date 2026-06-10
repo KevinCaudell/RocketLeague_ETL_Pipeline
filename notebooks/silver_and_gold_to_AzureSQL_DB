@@ -1,0 +1,279 @@
+# Give Databricks access to Blob Storage
+spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net", "YOUR AZURE BLOB STORAGE KEY")
+
+
+# Read Silver Data
+
+silver_replays_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/replays"
+)
+silver_players_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/players"
+)
+silver_match_stats_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/match_stats"
+)
+silver_maps_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_maps"
+)
+silver_seasons_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_seasons"
+)
+silver_playlists_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_playlists"
+)
+silver_dates_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_dates"
+)
+
+# Read Gold Data
+
+gold_map_performance_df = spark.read.format("delta").load(
+    "wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/map_performance"
+)
+gold_player_performance_df = spark.read.format("delta").load(
+    "wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/player_performance"
+)
+gold_playlist_performance_df = spark.read.format("delta").load(
+    "wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/playlist_performance"
+)
+gold_season_performance_df = spark.read.format("delta").load(
+    "wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/season_performance"
+)
+gold_daily_metrics_df = spark.read.format("delta").load(
+    "wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/daily_metrics"
+)
+
+# Database Connection (JDBC variables)
+
+SERVER = 'YOUR AZURE_SQL_DB SERVER'
+DATABASE = 'YOUR DATABASE'
+ADMIN = 'YOUR AZURE_SQL_DB USERNAME'
+PASSWORD = 'YOUR AZURE_SQL_DB PASSWORD'
+
+jdbc_url = (
+    f"jdbc:sqlserver://{SERVER}:1433;"
+    f"database={DATABASE};"
+    "encrypt=true;"
+    "trustServerCertificate=false;"
+    "hostNameInCertificate=*.database.windows.net;"
+    "loginTimeout=30;"
+)
+
+connection_properties = {
+    "user": ADMIN,
+    "password": PASSWORD,
+    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+}
+
+# Overwrite + Truncate Silver & Gold DataFrames in Azure SQL DB  
+
+# Match Stats
+empty_match_stats = spark.createDataFrame([], silver_match_stats_df.schema)
+empty_match_stats.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.fact_Match_Stats",
+    properties=connection_properties
+)
+
+# gold_Daily_Metrics
+empty_gold_daily_metrics = spark.createDataFrame([], gold_daily_metrics_df.schema)
+empty_gold_daily_metrics.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Daily_Metrics",
+    properties=connection_properties
+)
+
+# gold_Map_Performance
+empty_gold_maps = spark.createDataFrame([], gold_map_performance_df.schema)
+empty_gold_maps.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Map_Performance",
+    properties=connection_properties
+)
+
+# gold_Player_Performance
+empty_gold_players = spark.createDataFrame([], gold_player_performance_df.schema)
+empty_gold_players.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Player_Performance",
+    properties=connection_properties
+)
+
+# gold_Playlist_Performance
+empty_gold_playlists = spark.createDataFrame([], gold_playlist_performance_df.schema)
+empty_gold_playlists.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Playlist_Performance",
+    properties=connection_properties
+)
+
+# gold_Season_Performance
+empty_gold_seasons = spark.createDataFrame([], gold_season_performance_df.schema)
+empty_gold_seasons.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Season_Performance",
+    properties=connection_properties
+)
+
+# Players
+empty_dim_players = spark.createDataFrame([], silver_players_df.schema)
+empty_dim_players.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Players",
+    properties=connection_properties
+)
+
+# Replays
+empty_fact_replays = spark.createDataFrame([], silver_replays_df.schema)
+empty_fact_replays.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.fact_Replays",
+    properties=connection_properties
+)
+
+# dim_Maps
+empty_dim_maps = spark.createDataFrame([], silver_maps_df.schema)
+empty_dim_maps.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Maps",
+    properties=connection_properties
+)
+
+# dim_Dates
+empty_dim_dates = spark.createDataFrame([], silver_dates_df.schema)
+empty_dim_dates.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Dates",
+    properties=connection_properties
+)
+
+# dim_Playlists
+empty_dim_playlist = spark.createDataFrame([], silver_playlists_df.schema)
+empty_dim_playlist.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Playlists",
+    properties=connection_properties
+)
+
+# dim_Seasons
+empty_dim_seasons = spark.createDataFrame([], silver_seasons_df.schema)
+empty_dim_seasons.write.mode("overwrite").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Seasons",
+    properties=connection_properties
+)
+
+print("All tables cleared safely")
+
+##### 5. LOAD DATA (correct FK order) #####
+
+# dim_Maps 
+silver_maps_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Maps",
+    properties=connection_properties
+)
+
+print("Maps loaded")
+
+# dim_Dates 
+silver_dates_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Dates",
+    properties=connection_properties
+)
+
+print("Dates loaded")
+
+
+# dim_Playlists 
+silver_playlists_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Playlists",
+    properties=connection_properties
+)
+
+print("Playlists loaded")
+
+# dim_Seasons 
+silver_seasons_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Seasons",
+    properties=connection_properties
+)
+
+print("Seasons loaded")
+
+# Players 
+silver_players_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.dim_Players",
+    properties=connection_properties
+)
+
+print("Players loaded")
+
+# Replays 
+silver_replays_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.fact_Replays",
+    properties=connection_properties
+)
+
+print("Replays loaded")
+
+
+# Match Stats
+silver_match_stats_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.fact_Match_Stats",
+    properties=connection_properties
+)
+
+print("Match Stats loaded")
+
+# Player Performance
+gold_player_performance_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Player_Performance",
+    properties=connection_properties
+)
+
+print("Player Performance loaded")
+
+# Season Performance
+gold_season_performance_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Season_Performance",
+    properties=connection_properties
+)
+
+print("Season Performance loaded")
+
+# Map Performance
+gold_map_performance_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Map_Performance",
+    properties=connection_properties
+)
+
+print("Map Performance loaded")
+
+# Playlist Performance
+gold_playlist_performance_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Playlist_Performance",
+    properties=connection_properties
+)
+
+print("Playlist Performance loaded")
+
+# Daily Metrics
+gold_daily_metrics_df.write.mode("append").jdbc(
+    url=jdbc_url,
+    table="dbo.gold_Daily_Metrics",
+    properties=connection_properties
+)
+
+print("Daily Metrics loaded")
