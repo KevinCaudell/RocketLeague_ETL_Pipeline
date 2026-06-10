@@ -40,14 +40,14 @@ The database contains both Silver and Gold layer tables following a Medallion ar
 
 ![Rocket League ERD](images/RL_Analytics_ERD.png)
 
-# Silver Tables
+### Silver Tables
 
 - Replays
 - Match Stats
 
 These tables contain detailed replay level data used as the foundation for downstream analytics.
 
-# Gold Tables
+### Gold Tables
 
 
 - dim_Players
