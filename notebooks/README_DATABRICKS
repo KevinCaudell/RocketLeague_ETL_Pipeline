@@ -2,7 +2,7 @@
 
 This directory contains exported copies of Databricks notebooks used in my data pipeline project.
 
-## ⚠️ Important Notice
+## Important Notice
 
 - These files are **reference exports** of notebooks running in my Databricks workspace.
 - They represent the **exact logic and structure** used in the pipeline.
