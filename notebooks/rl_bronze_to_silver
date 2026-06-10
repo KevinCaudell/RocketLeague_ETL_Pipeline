@@ -1,46 +1,182 @@
-# Step 1: Give Databricks access to Blob Storage
-spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net", "<YOUR BLOB STORAGE KEY>")
+### Step 1: Give Databricks access to Blob Storage ###
+spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net", "<YOU AZURE BLOB STORAGE KEY>")
 
-# Step 2: Path to Bronze Level Blob Storage
+### Step 2: Path to Bronze Level Blob Storage ###
 bronze_df = spark.read.option("multiline", "true").json("wasbs://bronze-raw-data@rocketleaguetracker.blob.core.windows.net/replays/")
 
-# Step 3: Explode JSON from a List to Rows
-from pyspark.sql.functions import (explode, col, when, first, lit, coalesce)
-from pyspark.sql.functions import to_timestamp
+### Step 3: Explode JSON from a List to Rows ###
+from pyspark.sql.functions import (explode, col, when, lit, coalesce)
+from pyspark.sql.functions import to_date
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number
+from pyspark.sql.functions import (year, month, dayofmonth, quarter, dayofweek)
 
 exploded_bronze_df = bronze_df.select(explode("list").alias("Replays"))
 
-# Build Silver DataFrames (Replays, Players, Match Stats)
+### SILVER DIMENSION TABLES ###
 
-# Silver Replays
-silver_replays_df = exploded_bronze_df.select(
+# dim_Maps #
+
+dim_maps_df = exploded_bronze_df.select(
+    col("Replays.map_name").alias("map_name")
+).dropDuplicates()
+
+window_maps = Window.orderBy("map_name")
+
+dim_maps_df = dim_maps_df.withColumn(
+    "map_id",
+    row_number().over(window_maps)
+).select(
+    "map_id",
+    "map_name"
+)
+
+
+# dim_Playlists #
+
+dim_playlists_df = exploded_bronze_df.select(
+    col("Replays.playlist_name").alias("playlist_name")
+).dropDuplicates()
+
+window_playlists = Window.orderBy("playlist_name")
+
+dim_playlists_df = dim_playlists_df.withColumn(
+    "playlist_id",
+    row_number().over(window_playlists)
+).select(
+    "playlist_id",
+    "playlist_name"
+)
+
+
+# dim_Seasons #
+
+dim_seasons_df = exploded_bronze_df.select(
+    col("Replays.season").alias("season_number"),
+    col("Replays.season_type").alias("season_type")
+).dropDuplicates()
+
+window_seasons = Window.orderBy(
+    "season_number",
+    "season_type"
+)
+
+dim_seasons_df = dim_seasons_df.withColumn(
+    "season_id",
+    row_number().over(window_seasons)
+).select(
+    "season_id",
+    "season_number",
+    "season_type"
+)
+
+
+# dim_Dates #
+
+dim_dates_df = exploded_bronze_df.select(
+    to_date(col("Replays.date")).alias("date_id")
+).dropDuplicates()
+
+dim_dates_df = dim_dates_df.select(
+    col("date_id"),
+    year("date_id").alias("year"),
+    month("date_id").alias("month"),
+    dayofmonth("date_id").alias("day"),
+    quarter("date_id").alias("quarter"),
+    dayofweek("date_id").alias("day_of_week")
+)
+
+### SILVER FACT_REPLAYS ###
+
+replays_base_df = exploded_bronze_df.select(
     col("Replays.id").alias("replay_id"),
     col("Replays.rocket_league_id"),
     col("Replays.replay_title"),
+
     col("Replays.map_name"),
-    col("Replays.playlist_name").alias("playlist"),
-    col("Replays.duration").alias("match_duration"),
+    col("Replays.playlist_name"),
+
     col("Replays.season"),
     col("Replays.season_type"),
-    to_timestamp(col("Replays.date")).alias("date_time"),
-    coalesce(col("Replays.blue.goals"), lit(0)).alias("blue_goals"),
-    coalesce(col("Replays.orange.goals"), lit(0)).alias("orange_goals"),
+
+    to_date(col("Replays.date")).alias("date_id"),
+
+    col("Replays.duration")
+        .cast("int")
+        .alias("match_duration"),
+
+    coalesce(
+        col("Replays.blue.goals"),
+        lit(0)
+    ).cast("int").alias("blue_goals"),
+
+    coalesce(
+        col("Replays.orange.goals"),
+        lit(0)
+    ).cast("int").alias("orange_goals")
+)
+
+# JOIN MAP IDs #
+
+replays_base_df = replays_base_df.join(
+    dim_maps_df,
+    "map_name",
+    "left"
+)
+
+# JOIN PLAY IDs #
+
+replays_base_df = replays_base_df.join(
+    dim_playlists_df,
+    replays_base_df.playlist_name ==
+    dim_playlists_df.playlist_name,
+    "left"
+).drop(dim_playlists_df.playlist_name)
+
+# JOIN SEASON IDs #
+
+replays_base_df = replays_base_df.join(
+    dim_seasons_df,
+    (
+        (replays_base_df.season ==
+         dim_seasons_df.season_number)
+        &
+        (replays_base_df.season_type ==
+         dim_seasons_df.season_type)
+    ),
+    "left"
+).drop(
+    dim_seasons_df.season_number,
+    dim_seasons_df.season_type
+)
+
+# FINAL Fact_Replays STRUCTURE #
+
+silver_replays_df = replays_base_df.select(
+    "replay_id",
+    "rocket_league_id",
+    "replay_title",
+    "match_duration",
+    "blue_goals",
+    "orange_goals",
+    "map_id",
+    "playlist_id",
+    "season_id",
+    "date_id",
+
     when(
-        coalesce(col("Replays.blue.goals"), lit(0)) >
-        coalesce(col("Replays.orange.goals"), lit(0)),
+        col("blue_goals") > col("orange_goals"),
         "Blue"
     ).when(
-        coalesce(col("Replays.blue.goals"), lit(0)) <
-        coalesce(col("Replays.orange.goals"), lit(0)),
+        col("blue_goals") < col("orange_goals"),
         "Orange"
-    )
-    .otherwise("Tie")
+    ).otherwise("Tie")
     .alias("winner")
 )
 
-# Silver Players
+# SILVER PLAYERS #
+
 blue_players_df = exploded_bronze_df.select(
-    col("Replays.id").alias("replay_id"),
     explode("Replays.blue.players").alias("player")
 )
 
@@ -51,7 +187,6 @@ blue_players = blue_players_df.select(
 )
 
 orange_players_df = exploded_bronze_df.select(
-    col("Replays.id").alias("replay_id"),
     explode("Replays.orange.players").alias("player")
 )
 
@@ -61,13 +196,13 @@ orange_players = orange_players_df.select(
     col("player.id.platform").alias("platform")
 )
 
-all_players = blue_players.unionByName(orange_players)
+silver_players_df = (
+    blue_players
+    .unionByName(orange_players)
+    .dropDuplicates(["player_id"])
+)
 
-from pyspark.sql import Window
-
-silver_players_df = all_players.dropDuplicates(["player_id"])
-
-# Silver Match Stats
+# SILVER MATCH_STATS #
 
 blue_stats_df = exploded_bronze_df.select(
     col("Replays.id").alias("replay_id"),
@@ -77,11 +212,17 @@ blue_stats_df = exploded_bronze_df.select(
 blue_stats = blue_stats_df.select(
     col("replay_id"),
     col("player.id.id").alias("player_id"),
-    lit("blue").alias("team"),
-    col("player.score").alias("score"),
-    (when(col("player.mvp") == True, True).otherwise(False)).alias("mvp"),
-    col("player.start_time").cast("decimal(10,2)").alias("start_time"),
-    col("player.end_time").cast("decimal(10,2)").alias("end_time")
+    lit("Blue").alias("team"),
+    col("player.score").cast("bigint").alias("score"),
+    when(col("player.mvp") == True, True)
+        .otherwise(False)
+        .alias("mvp"),
+    col("player.start_time")
+        .cast("decimal(10,2)")
+        .alias("start_time"),
+    col("player.end_time")
+        .cast("decimal(10,2)")
+        .alias("end_time")
 )
 
 orange_stats_df = exploded_bronze_df.select(
@@ -92,16 +233,24 @@ orange_stats_df = exploded_bronze_df.select(
 orange_stats = orange_stats_df.select(
     col("replay_id"),
     col("player.id.id").alias("player_id"),
-    lit("orange").alias("team"),
-    col("player.score").alias("score"),
-    (when(col("player.mvp") == True, True).otherwise(False)).alias("mvp"),
-    col("player.start_time").cast("decimal(10,2)").alias("start_time"),
-    col("player.end_time").cast("decimal(10,2)").alias("end_time")
+    lit("Orange").alias("team"),
+    col("player.score").cast("bigint").alias("score"),
+    when(col("player.mvp") == True, True)
+        .otherwise(False)
+        .alias("mvp"),
+    col("player.start_time")
+        .cast("decimal(10,2)")
+        .alias("start_time"),
+    col("player.end_time")
+        .cast("decimal(10,2)")
+        .alias("end_time")
 )
 
-silver_match_stats_df = blue_stats.unionByName(orange_stats)
+silver_match_stats_df = blue_stats.unionByName(
+    orange_stats
+)
 
-# Write Silver DataFrames to Silver Blob Container
+### WRITE SILVER TABLES ###
 
 silver_replays_df.write \
     .format("delta") \
@@ -120,5 +269,29 @@ silver_match_stats_df.write \
     .mode("overwrite") \
     .option("mergeSchema", "true") \
     .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/match_stats/")
+
+dim_maps_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_maps/")
+
+dim_playlists_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_playlists/")
+
+dim_seasons_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_seasons/")
+
+dim_dates_df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/dim_dates/")
 
 print("Silver transformation completed successfully")
