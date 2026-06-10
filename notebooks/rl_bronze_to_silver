@@ -1,4 +1,4 @@
-```
+```text
 ### Step 1: Give Databricks access to Blob Storage ###
 spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net", "<YOU AZURE BLOB STORAGE KEY>")
 
