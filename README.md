@@ -80,6 +80,14 @@ API → Blob Storage (Bronze) → Databricks (Silver) → SQL (Gold)
 
 ---
 
+## Data Model (ERD)
+
+The Gold layer follows a dimensional modeling approach consisting of fact and dimension tables optimized for analytics workloads.
+
+![Rocket League ERD](images/RocketLeague_Analytics_ERD.png)
+
+---
+
 ## Security Notice
 
 This repository contains **sanitized and redacted code only**.
