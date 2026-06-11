@@ -85,6 +85,7 @@ These tables contain aggregated KPIs and metrics designed for Power BI reporting
 - **Microsoft Azure Blob Storage** – Raw data (Bronze Layer) / Cleaned data (Silver Layer) / Aggregated metrics (Gold Layer)
 - **Azure SQL Database** – Structured analytics storage
 - **Python** – API integration + orchestration logic
+- **Power BI** – Data visualization and dashboarding for analytics-ready Gold layer datasets
 - **Rocket League API (Ballchasing)** – Data source
 
 ---
