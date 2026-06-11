@@ -69,11 +69,13 @@ These tables contain aggregated KPIs and metrics designed for Power BI reporting
 
 ### Dashboard 1 - Overview
 
-[Download Full Report (PDF)](images/RocketLeague Analytics.pdf)
+![Dashboard 1](images/Overview_dashboard.png)
 
 ### Dashboard 2 - Player Analytics
 
-[Download Full Report (PDF)](images/Player_Analytics_dashboard.png)
+![Dashboard 2](images/Player_Analytics_dashboard.png)
+
+[Download Full Report (PDF)](images/Rocketleague_dashboard.png)
 
 ---
 
