@@ -5,7 +5,7 @@ spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net",
 bronze_df = spark.read.option("multiline", "true").json("wasbs://bronze-raw-data@rocketleaguetracker.blob.core.windows.net/replays/")
 
 ### Step 3: Explode JSON from a List to Rows ###
-from pyspark.sql.functions import (explode, col, when, lit, coalesce)
+from pyspark.sql.functions import (explode, col, when, lit, coalesce, expr, trim)
 from pyspark.sql.functions import to_date
 from pyspark.sql.window import Window
 from pyspark.sql.functions import row_number
@@ -79,12 +79,14 @@ dim_seasons_df = exploded_bronze_df.select(
     col("Replays.season_type").alias("season_type")
 )
 
+
 dim_seasons_df = remove_null_keys(dim_seasons_df, "season_number")
 dim_seasons_df = remove_null_keys(dim_seasons_df, "season_type")
 
+
+# (col("season_number") != "") &
 dim_seasons_df = dim_seasons_df.filter(
-    (col("season_number") != "") &
-    (col("season_type") != "")
+    col("season_type") != ""
 )
 
 dim_seasons_df = dim_seasons_df.dropDuplicates()
@@ -132,15 +134,25 @@ replays_base_df = exploded_bronze_df.select(
     col("Replays.map_name"),
     col("Replays.playlist_name"),
 
-    col("Replays.season"),
-    col("Replays.season_type"),
+    col("Replays.season").alias("season_number"),
+    col("Replays.season_type").alias("season_type"),
 
     to_date(col("Replays.date")).alias("date_id"),
+    
+    coalesce(
+        expr("try_cast(nullif(trim(Replays.duration), '') as int)"), 
+        lit(0)
+    ).alias("match_duration"),
 
-    col("Replays.duration").cast("int").alias("match_duration"),
+    coalesce(
+        expr("try_cast(nullif(trim(Replays.blue.goals), '') as int)"), 
+        lit(0)
+    ).alias("blue_goals"),
 
-    coalesce(col("Replays.blue.goals"),lit(0)).cast("int").alias("blue_goals"),
-    coalesce(col("Replays.orange.goals"),lit(0)).cast("int").alias("orange_goals")
+    coalesce(
+        expr("try_cast(nullif(trim(Replays.orange.goals), '') as int)"), 
+        lit(0)
+    ).alias("orange_goals")
 )
 
 # CLEAN JOIN KEYS #
@@ -148,7 +160,7 @@ replays_base_df = exploded_bronze_df.select(
 replays_base_df = replays_base_df.filter(
     col("map_name").isNotNull() &
     col("playlist_name").isNotNull() &
-    col("season").isNotNull() &
+    col("season_number").isNotNull() &
     col("season_type").isNotNull() &
     col("date_id").isNotNull() &
     col("replay_id").isNotNull()
@@ -174,7 +186,7 @@ replays_base_df = replays_base_df.join(
 
 replays_base_df = replays_base_df.join(
     dim_seasons_df,
-    ["season", "season_type"],
+    ["season_number", "season_type"],
     "left"
 )
 
@@ -207,13 +219,6 @@ silver_replays_df = remove_null_keys(
     "replay_id"
 )
 
-silver_replays_df.filter(
-    col("map_id").isNull() |
-    col("playlist_id").isNull() |
-    col("season_id").isNull() |
-    col("date_id").isNull()
-).show()                                   # Check for Silent Fails
-
 # SILVER PLAYERS #
 
 blue_players_df = exploded_bronze_df.select(
@@ -222,8 +227,21 @@ blue_players_df = exploded_bronze_df.select(
 
 blue_players = blue_players_df.select(
     col("player.id.id").alias("player_id"),
-    col("player.name").alias("player_name"),
-    col("player.id.platform").alias("platform")
+
+    when(
+        trim(coalesce(col("player.name"), lit(""))) == "",
+        lit("Unknown Player")
+    ).otherwise(
+        col("player.name")
+    ).alias("player_name"),
+
+    when(
+        trim(coalesce(col("player.id.platform"), lit(""))) == "",
+        lit("Unknown")
+    ).otherwise(
+        col("player.id.platform")
+    ).alias("platform")
+
 ).filter(col("player_id").isNotNull())
 
 orange_players_df = exploded_bronze_df.select(
@@ -231,9 +249,21 @@ orange_players_df = exploded_bronze_df.select(
 )
 
 orange_players = orange_players_df.select(
-    col("player.id.id").alias("player_id"),
-    col("player.name").alias("player_name"),
-    col("player.id.platform").alias("platform")
+    col("player.id.id").alias("player_id"), 
+    when(
+        trim(coalesce(col("player.name"), lit(""))) == "",
+        lit("Unknown Player")
+    ).otherwise(
+        col("player.name")
+    ).alias("player_name"),
+
+    when(
+        trim(coalesce(col("player.id.platform"), lit(""))) == "",
+            lit("Unknown")
+    ).otherwise(
+        col("player.id.platform")
+    ).alias("platform")
+    
 ).filter(col("player_id").isNotNull())
 
 silver_players_df = (blue_players.unionByName(orange_players))
@@ -256,8 +286,14 @@ blue_stats = blue_stats_df.select(
     col("replay_id"),
     col("player.id.id").alias("player_id"),
     lit("Blue").alias("team"),
-    col("player.score").cast("bigint").alias("score"),
+
+    coalesce(
+        expr("try_cast(nullif(trim(player.score), '') as bigint)"),
+        lit(0)
+    ).alias("score"),
+
     when(col("player.mvp") == True, True).otherwise(False).alias("mvp"),
+
     col("player.start_time").cast("decimal(10,2)").alias("start_time"),
     col("player.end_time").cast("decimal(10,2)").alias("end_time")
 )
@@ -271,19 +307,24 @@ orange_stats = orange_stats_df.select(
     col("replay_id"),
     col("player.id.id").alias("player_id"),
     lit("Orange").alias("team"),
-    col("player.score").cast("bigint").alias("score"),
+
+    coalesce(
+        expr("try_cast(nullif(trim(player.score), '') as bigint)"),
+        lit(0)
+    ).alias("score"),
+
     when(col("player.mvp") == True, True).otherwise(False).alias("mvp"),
+
     col("player.start_time").cast("decimal(10,2)").alias("start_time"),
     col("player.end_time").cast("decimal(10,2)").alias("end_time")
 )
 
-silver_match_stats_df = blue_stats.unionByName(orange_stats)
+silver_match_stats_df = blue_stats.unionByName(orange_stats, allowMissingColumns=False)
                                                                     
 silver_match_stats_df = remove_null_keys(
     silver_match_stats_df,
     "player_id"
-)
-                                                                   
+)                                    
 
 ### WRITE SILVER TABLES ###
 
