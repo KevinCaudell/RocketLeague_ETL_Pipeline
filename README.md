@@ -68,7 +68,7 @@ These tables contain aggregated KPIs and metrics designed for Power BI reporting
 ## Tech Stack
 
 - **Databricks (PySpark)** – Data processing and transformation
-- **Microsoft Azure Blob Storage** – Raw data storage (Bronze layer)
+- **Microsoft Azure Blob Storage** – Raw data (Bronze Layer) / Cleaned data (Silver Layer) / Aggregated metrics (Gold Layer)
 - **Azure SQL Database** – Structured analytics storage
 - **Python** – API integration + orchestration logic
 - **Rocket League API (Ballchasing)** – Data source
