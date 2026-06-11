@@ -1,0 +1,261 @@
+### Step 1: Give Databricks access to Blob Storage ###
+spark.conf.set("fs.azure.account.key.rocketleaguetracker.blob.core.windows.net", "<YOUR AZURE BLOB STORAGE KEY>")
+
+
+### Step 2: Read Silver data and store in DataFrames ###
+
+silver_replays_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/replays"
+)
+
+silver_players_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/players"
+)
+
+silver_match_stats_df = spark.read.format("delta").load(
+    "wasbs://silver-transformed-data@rocketleaguetracker.blob.core.windows.net/match_stats"
+)
+
+### Step 3: Aggregations ###
+
+from pyspark.sql.functions import col, count, sum, avg, round
+
+### Player Performance (GOLD) ###
+
+player_base = silver_match_stats_df.groupBy("player_id").agg(
+    count("*").alias("matches_played"),
+    sum("score").alias("total_score"),
+    avg("score").alias("avg_score"),
+    sum(col("mvp").cast("int")).alias("mvp_count"),
+    avg(
+        col("end_time") - col("start_time")
+    ).alias("avg_play_time")
+)
+
+replay_results = silver_replays_df.select(
+    "replay_id",
+    "winner"
+)
+
+joined = silver_match_stats_df.join(replay_results, "replay_id")
+
+
+wins = joined.filter(
+    col("team") == col("winner")
+).groupBy("player_id") \
+ .count() \
+ .withColumnRenamed("count", "wins")
+
+losses = joined.filter(
+    (col("winner") != "Tie") &
+    (col("team") != col("winner"))
+).groupBy("player_id") \
+ .count() \
+ .withColumnRenamed("count", "losses")
+
+ties = joined.filter(
+    col("winner") == "Tie"
+).groupBy("player_id") \
+ .count() \
+ .withColumnRenamed("count", "ties")
+
+gold_player_performance = player_base \
+    .join(wins, "player_id", "left") \
+    .join(losses, "player_id", "left") \
+    .join(ties, "player_id", "left") \
+    .fillna(0)
+
+gold_player_performance = gold_player_performance.withColumn(
+    "win_rate",
+    round(col("wins") / col("matches_played") * 100, 2)
+).withColumn(
+    "mvp_rate",
+    round(col("mvp_count") / col("matches_played") * 100, 2)
+)
+
+gold_player_performance = gold_player_performance.select(
+    "player_id",
+    "matches_played",
+    "wins",
+    "losses",
+    "ties",
+    "win_rate",
+    "avg_score",
+    "total_score",
+    "mvp_count",
+    "mvp_rate",
+    "avg_play_time"
+)
+
+gold_player_performance = gold_player_performance \
+    .withColumn("win_rate", round(col("win_rate"), 2)) \
+    .withColumn("avg_score", round(col("avg_score"), 2)) \
+    .withColumn("mvp_rate", round(col("mvp_rate"), 2)) \
+    .withColumn("avg_play_time", round(col("avg_play_time"), 2))
+
+### Map Performance (GOLD) ###
+
+gold_map_performance = silver_replays_df.groupBy("map_id").agg(
+    count("*").alias("matches_played"),
+    avg(
+        col("blue_goals") + col("orange_goals")
+    ).alias("avg_goals"),
+    avg("match_duration").alias("avg_duration")
+)
+
+
+gold_map_performance = gold_map_performance.select(
+    "map_id",
+    "matches_played",
+    "avg_goals",
+    "avg_duration"
+)
+
+gold_map_performance = gold_map_performance \
+    .withColumn("avg_goals", round(col("avg_goals"), 2)) \
+    .withColumn("avg_duration", round(col("avg_duration"), 2))
+
+### Playlist Performance (GOLD) ###
+
+from pyspark.sql.functions import when
+
+gold_playlist_performance = silver_replays_df.groupBy(
+    "playlist_id"
+).agg(
+    count("*").alias("matches_played"),
+
+    avg("match_duration").alias(
+        "avg_match_duration"
+    ),
+
+    avg(
+        col("blue_goals") + col("orange_goals")
+    ).alias("avg_total_goals"),
+
+    round(
+        avg(
+            when(col("winner") == "Blue", 1)
+            .otherwise(0)
+        ) * 100,
+        2
+    ).alias("blue_win_rate"),
+
+    round(
+        avg(
+            when(col("winner") == "Orange", 1)
+            .otherwise(0)
+        ) * 100,
+        2
+    ).alias("orange_win_rate")
+)
+
+gold_playlist_performance = gold_playlist_performance.select(
+    "playlist_id",
+    "matches_played",
+    "avg_match_duration",
+    "avg_total_goals",
+    "blue_win_rate",
+    "orange_win_rate"
+)
+
+gold_playlist_performance = gold_playlist_performance \
+    .withColumn("avg_match_duration", round(col("avg_match_duration"), 2)) \
+    .withColumn("avg_total_goals", round(col("avg_total_goals"), 2)) \
+    .withColumn("blue_win_rate", round(col("blue_win_rate"), 2)) \
+    .withColumn("orange_win_rate", round(col("orange_win_rate"), 2))
+
+### Season Performance (GOLD) ###
+
+from pyspark.sql.functions import countDistinct
+
+gold_season_performance = silver_replays_df.join(
+    silver_match_stats_df,
+    "replay_id"
+).groupBy("season_id").agg(
+    countDistinct("replay_id")
+        .alias("matches_played"),
+
+    avg(
+        col("blue_goals") + col("orange_goals")
+    ).alias("avg_goals"),
+
+    countDistinct("player_id")
+        .alias("unique_players")
+)
+
+gold_season_performance = gold_season_performance.select(
+    "season_id",
+    "matches_played",
+    "avg_goals",
+    "unique_players"
+)
+
+gold_season_performance = gold_season_performance \
+    .withColumn("avg_goals", round(col("avg_goals"), 2))
+
+### Daily Metrics (GOLD) ###
+
+daily_base = silver_replays_df.join(silver_match_stats_df, "replay_id")
+
+gold_daily_metrics = daily_base.groupBy(
+    "date_id"
+).agg(
+    countDistinct("replay_id")
+        .alias("matches_played"),
+
+    countDistinct("player_id")
+        .alias("unique_players"),
+
+    avg("score")
+        .alias("avg_score"),
+
+    avg(
+        col("blue_goals") + col("orange_goals")
+    ).alias("avg_goals")
+)
+
+gold_daily_metrics = gold_daily_metrics.select(
+    "date_id",
+    "matches_played",
+    "unique_players",
+    "avg_score",
+    "avg_goals"
+)
+
+gold_daily_metrics = gold_daily_metrics \
+    .withColumn("avg_score", round(col("avg_score"), 2)) \
+    .withColumn("avg_goals", round(col("avg_goals"), 2))
+
+############################################
+
+### Write to Gold Blob Container ###
+
+gold_player_performance.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/player_performance/")
+
+gold_map_performance.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/map_performance/")
+
+gold_playlist_performance.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/playlist_performance/")
+
+gold_season_performance.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/season_performance/")
+
+gold_daily_metrics.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .save("wasbs://gold-metric-data@rocketleaguetracker.blob.core.windows.net/daily_metrics/")
