@@ -33,7 +33,3 @@ Thumbs.db
 # Ignore MySQL WorkBench files
 *.mwb
 *.mwb.bak
-
-# Power BI
-
-*.pbix
