@@ -65,6 +65,18 @@ These tables contain aggregated KPIs and metrics designed for Power BI reporting
 
 ---
 
+## Power BI Dashboards
+
+### Dashboard 1 - Overview
+
+[Download Full Report (PDF)](images/RocketLeague Analytics.pdf)
+
+### Dashboard 2 - Player Analytics
+
+[Download Full Report (PDF)](images/Player_Analytics_dashboard.png)
+
+---
+
 ## Tech Stack
 
 - **Databricks (PySpark)** – Data processing and transformation
