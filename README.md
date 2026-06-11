@@ -77,6 +77,12 @@ These tables contain aggregated KPIs and metrics designed for Power BI reporting
 
 [Download Full Report (PDF)](images/RocketLeague_dashboards.pdf)
 
+### Reporting Notes
+
+The initial Power BI dashboards were developed using replay-level fact data, match statistics, and supporting dimension tables stored in Azure SQL Database.
+
+Additional Gold-layer performance and metrics tables were created as part of the warehouse design to support future reporting, aggregations, and analytical use cases.
+
 ---
 
 ## Tech Stack
